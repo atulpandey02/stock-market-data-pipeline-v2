@@ -1,0 +1,160 @@
+version: 2
+
+models:
+  - name: mart_stock_performance
+    description: >
+      Primary historical performance mart. One row per symbol per trading day.
+      Combines OHLCV data with daily returns, rolling technical indicators
+      (SMAs, volatility, RSI), and MA crossover signals. Designed for BI tools
+      and as the structured context layer for GenAI queries.
+    tags: ['mart', 'batch']
+    columns:
+      - name: symbol
+        description: Stock ticker symbol
+        tests:
+          - not_null
+      - name: trade_date
+        description: Calendar date of the trading session
+        tests:
+          - not_null
+      - name: close_price
+        description: Closing price on the trade date
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0.01
+              max_value: 1000000
+      - name: daily_return_pct
+        description: Daily percentage price return vs prior close
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: -100
+              max_value: 10000
+              config:
+                severity: warn
+      - name: sma_5d
+        description: 5-day simple moving average of close price
+      - name: sma_20d
+        description: 20-day simple moving average of close price
+      - name: sma_50d
+        description: 50-day simple moving average of close price
+      - name: ma_signal_5_20
+        description: >
+          Crossover signal comparing 5-day vs 20-day SMA.
+          GOLDEN_CROSS = bullish. DEATH_CROSS = bearish.
+        tests:
+          - accepted_values:
+              values: ['GOLDEN_CROSS', 'DEATH_CROSS', 'NEUTRAL']
+      - name: ma_signal_10_50
+        description: Crossover signal comparing 10-day vs 50-day SMA.
+        tests:
+          - accepted_values:
+              values: ['GOLDEN_CROSS', 'DEATH_CROSS', 'NEUTRAL']
+      - name: rsi_14
+        description: 14-period Relative Strength Index (0–100)
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100
+              config:
+                severity: warn
+      - name: rsi_signal
+        description: RSI interpretation. OVERBOUGHT >70, OVERSOLD <30.
+        tests:
+          - accepted_values:
+              values: ['OVERBOUGHT', 'OVERSOLD', 'NEUTRAL']
+      - name: annualised_volatility_pct
+        description: Annualised volatility calculated from 20-day return std dev
+      - name: high_52w
+        description: 52-week rolling high price
+      - name: low_52w
+        description: 52-week rolling low price
+      - name: pct_of_52w_range
+        description: Where current close sits in the 52-week range (0–100%)
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100
+              config:
+                severity: warn
+      - name: dbt_updated_at
+        description: Timestamp when dbt last materialised this record
+        tests:
+          - not_null
+
+  - name: mart_realtime_signals
+    description: >
+      Real-time streaming signals mart. One row per symbol per 15-minute window.
+      Surfaces momentum, volatility regime, volume spikes, and a composite
+      alert flag. The signal_summary column is specifically designed for
+      injection into GenAI prompts as structured market context.
+    tags: ['mart', 'streaming']
+    columns:
+      - name: symbol
+        description: Stock ticker symbol
+        tests:
+          - not_null
+      - name: window_start_at
+        description: UTC start of the 15-minute analytics window
+        tests:
+          - not_null
+      - name: momentum_signal
+        description: Price momentum direction derived from MA crossover
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['BULLISH', 'BEARISH', 'NEUTRAL']
+      - name: volatility_regime
+        description: >
+          Volatility classification relative to 1-hour average.
+          LOW / NORMAL / ELEVATED / HIGH
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['LOW', 'NORMAL', 'ELEVATED', 'HIGH']
+      - name: is_volume_spike
+        description: True if current window volume >= 2x the 1-hour average
+        tests:
+          - not_null
+      - name: is_multi_signal_alert
+        description: >
+          True when non-neutral momentum, elevated/high volatility,
+          and a volume spike all coincide. Key alert flag for GenAI layer.
+        tests:
+          - not_null
+      - name: signal_summary
+        description: >
+          Human-readable one-line summary of all signals for a window.
+          Designed for direct injection into LLM prompts as market context.
+        tests:
+          - not_null
+
+  - name: mart_daily_summary
+    description: >
+      Cross-symbol market-wide daily summary. One row per trading date.
+      Aggregates breadth (advancers/decliners), top movers, average returns,
+      and volatility across all tracked symbols. Primary mart for executive
+      dashboards and GenAI daily market digest prompts.
+    tags: ['mart', 'batch']
+    columns:
+      - name: trade_date
+        description: The calendar trading date
+        tests:
+          - not_null
+          - unique
+      - name: symbols_tracked
+        description: Number of distinct symbols with data on this date
+        tests:
+          - not_null
+      - name: advance_decline_ratio_pct
+        description: Percentage of symbols that advanced on the day (0–100)
+      - name: top_gainer_symbol
+        description: Symbol with the highest daily return
+      - name: top_loser_symbol
+        description: Symbol with the lowest daily return
+      - name: avg_annualised_vol_pct
+        description: Average annualised volatility across all symbols
+      - name: golden_cross_5_20_count
+        description: Number of symbols showing a 5/20 golden cross
+      - name: death_cross_5_20_count
+        description: Number of symbols showing a 5/20 death cross

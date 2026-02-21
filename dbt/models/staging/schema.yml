@@ -1,0 +1,91 @@
+version: 2
+
+models:
+  - name: stg_daily_stock_metrics
+    description: >
+      Cleaned and standardised daily OHLCV stock metrics sourced from the
+      Spark batch pipeline. One row per symbol per trading day. Prices and
+      volumes are cast to correct types; obviously invalid records are removed.
+    tags: ['staging', 'batch']
+    columns:
+      - name: symbol
+        description: Uppercase stock ticker symbol (e.g. AAPL, MSFT, GOOGL)
+        tests:
+          - not_null
+      - name: trade_date
+        description: The calendar date of the trading session
+        tests:
+          - not_null
+      - name: open_price
+        description: Opening price at market open
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1000000
+      - name: high_price
+        description: Intraday high price
+        tests:
+          - not_null
+      - name: low_price
+        description: Intraday low price
+        tests:
+          - not_null
+      - name: close_price
+        description: Closing price at market close
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0.01
+              max_value: 1000000
+      - name: volume
+        description: Total shares traded during the session
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: batch_loaded_at
+        description: Timestamp when the record was written to Snowflake
+        tests:
+          - not_null
+      - name: dbt_updated_at
+        description: Timestamp when dbt last processed this record
+
+  - name: stg_realtime_stock_analytics
+    description: >
+      Cleaned real-time streaming analytics with sliding window metrics (15-min
+      and 1-hour) sourced from the Spark structured streaming pipeline.
+      One row per symbol per window interval.
+    tags: ['staging', 'streaming']
+    columns:
+      - name: symbol
+        description: Uppercase stock ticker symbol
+        tests:
+          - not_null
+      - name: window_start_at
+        description: UTC timestamp of the window start
+        tests:
+          - not_null
+      - name: window_end_at
+        description: UTC timestamp of the window end
+        tests:
+          - not_null
+      - name: window_duration_minutes
+        description: Derived duration of the analytics window in minutes
+      - name: ma_15m
+        description: 15-minute moving average price
+      - name: ma_1h
+        description: 1-hour moving average price
+      - name: volatility_15m
+        description: Price standard deviation over the 15-minute window
+      - name: volume_15m
+        description: Total shares traded in the 15-minute window
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: stream_loaded_at
+        description: Timestamp when the record was written to Snowflake
+        tests:
+          - not_null
+      - name: dbt_updated_at
+        description: Timestamp when dbt last processed this record

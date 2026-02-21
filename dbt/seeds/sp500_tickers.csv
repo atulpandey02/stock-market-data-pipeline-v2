@@ -1,0 +1,11 @@
+symbol,company_name,sector,industry,market_cap_tier
+AAPL,Apple Inc.,Technology,Consumer Electronics,LARGE
+MSFT,Microsoft Corporation,Technology,Software,LARGE
+GOOGL,Alphabet Inc.,Technology,Internet Services,LARGE
+AMZN,Amazon.com Inc.,Consumer Discretionary,E-Commerce,LARGE
+META,Meta Platforms Inc.,Technology,Social Media,LARGE
+TSLA,Tesla Inc.,Consumer Discretionary,Electric Vehicles,LARGE
+NVDA,NVIDIA Corporation,Technology,Semiconductors,LARGE
+JPM,JPMorgan Chase & Co.,Financials,Banking,LARGE
+JNJ,Johnson & Johnson,Healthcare,Pharmaceuticals,LARGE
+V,Visa Inc.,Financials,Payment Processing,LARGE
